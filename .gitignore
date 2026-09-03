@@ -1,0 +1,27 @@
+node_modules/
+dist/
+
+.env
+.env.*
+!.env.example
+
+# Python
+backend/venv/
+backend/__pycache__/
+__pycache__/
+*.pyc
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Local/test files
+*.zip
+test_results.json
+debug_math_preprocessed.png
+
+# IDE / OS
+.vscode/
+.DS_Store
+Thumbs.db
