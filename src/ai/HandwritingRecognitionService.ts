@@ -56,7 +56,8 @@ export class RecognitionService {
 
 export class ApiRecognitionProvider implements RecognitionProvider {
   private getApiUrl(): string {
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+    const metaEnv = (import.meta as any).env;
+    const baseUrl = metaEnv?.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
     // Trim trailing slash if present
     const cleanBaseUrl = baseUrl.replace(/\/+$/, '');
     return `${cleanBaseUrl}/api/v1/analyze`;
