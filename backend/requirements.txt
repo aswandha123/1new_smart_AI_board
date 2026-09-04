@@ -1,12 +1,13 @@
 fastapi
 uvicorn
 sqlalchemy
+aiosqlite
+asyncpg
 pydantic
 pydantic-settings
 python-dotenv
 psycopg2-binary
 pix2text
 pytesseract
-
 pillow
 sympy

@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ai-smart-board-backend
+    env: docker
+    dockerContext: backend
+    dockerfilePath: backend/Dockerfile
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: 8000
