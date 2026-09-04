@@ -328,7 +328,7 @@ export class BoardExporter {
       this.renderObjectToCanvas(ctx, obj);
     }
 
-    return canvas.toDataURL('image/jpeg', 0.9);
+    return canvas.toDataURL('image/png');
   }
 
   /**

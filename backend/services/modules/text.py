@@ -19,12 +19,17 @@ def process_text(image_b64: str) -> Dict[str, Any]:
         logger.error(f"Failed to decode image: {e}")
         raise ValueError("Invalid image data format.")
 
-    # Image Preprocessing for Tesseract OCR Handwriting
     try:
-        # Convert to Grayscale
-        img_gray = ImageOps.grayscale(img)
+        import pytesseract
+    except ImportError:
+        logger.error("pytesseract is not installed.")
+        raise RuntimeError("PyTesseract is unavailable on the server.")
 
-        # Crop to content bounding box
+    recognized_content = ""
+
+    # Preprocessing Pipeline 1: Grayscale + Crop + White Padding + Contrast Enhancement
+    try:
+        img_gray = ImageOps.grayscale(img)
         inverted = ImageOps.invert(img_gray)
         bbox = inverted.getbbox()
         if bbox:
@@ -32,48 +37,66 @@ def process_text(image_b64: str) -> Dict[str, Any]:
         else:
             img_cropped = img_gray
 
-        # Expand with white border padding (crucial for Tesseract stroke detection)
-        padding = 40
-        img_padded = ImageOps.expand(img_cropped, border=padding, fill=255)
+        # Expand with 40px white border padding
+        img_padded = ImageOps.expand(img_cropped, border=40, fill=255)
 
-        # Contrast enhancement
+        # Enhance contrast
         enhancer = ImageEnhance.Contrast(img_padded)
         img_enhanced = enhancer.enhance(2.0)
 
         # Scale up if small
         w, h = img_enhanced.size
-        if w < 300 or h < 300:
-            scale = max(300 / max(w, 1), 300 / max(h, 1))
+        if w < 350 or h < 350:
+            scale = max(350 / max(w, 1), 350 / max(h, 1))
             img_enhanced = img_enhanced.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
 
-    except Exception as preprocess_err:
-        logger.warning(f"Preprocessing failed, using raw image: {preprocess_err}")
-        img_enhanced = img
+        # Try multiple Page Segmentation Modes for handwriting
+        psm_configs = ['--psm 6', '--psm 7', '--psm 11', '']
+        for config in psm_configs:
+            try:
+                res = pytesseract.image_to_string(img_enhanced, config=config).strip()
+                if res:
+                    recognized_content = res
+                    logger.info(f"Tesseract recognized text with config '{config}': {recognized_content}")
+                    break
+            except Exception:
+                continue
 
-    try:
-        import pytesseract
-    except ImportError:
-        logger.error("pytesseract is not installed.")
-        raise RuntimeError("PyTesseract is unavailable on the server.")
+    except Exception as err1:
+        logger.warning(f"Pipeline 1 error: {err1}")
 
-    try:
-        # Try Page Segmentation Mode 6 (single uniform block of text) first
-        text = pytesseract.image_to_string(img_enhanced, config='--psm 6')
-        if not text.strip():
-            # Fallback to default PSM mode
-            text = pytesseract.image_to_string(img_enhanced)
-    except Exception as e:
-        logger.error(f"Pytesseract processing error: {e}")
-        raise RuntimeError(f"PyTesseract processing failed: {str(e)}")
-
-    recognized_content = text.strip()
+    # Preprocessing Pipeline 2 (Fallback): Pure Black & White Binarization
     if not recognized_content:
-        recognized_content = "No text could be recognized. Please draw/write more clearly."
+        try:
+            img_bw = img_gray.point(lambda p: 0 if p < 210 else 255)
+            img_bw_cropped = img_bw.crop(bbox) if bbox else img_bw
+            img_bw_padded = ImageOps.expand(img_bw_cropped, border=50, fill=255)
+
+            w, h = img_bw_padded.size
+            if w < 400 or h < 400:
+                scale = max(400 / max(w, 1), 400 / max(h, 1))
+                img_bw_padded = img_bw_padded.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
+
+            for config in ['--psm 6', '--psm 11', '']:
+                try:
+                    res = pytesseract.image_to_string(img_bw_padded, config=config).strip()
+                    if res:
+                        recognized_content = res
+                        logger.info(f"Tesseract recognized text via binarization: {recognized_content}")
+                        break
+                except Exception:
+                    continue
+
+        except Exception as err2:
+            logger.warning(f"Pipeline 2 error: {err2}")
+
+    if not recognized_content:
+        recognized_content = "No text could be recognized. Please draw or write more clearly."
 
     return {
         "module": "text",
         "result_type": "text",
         "recognized_content": recognized_content,
-        "explanation": "Text recognized using Tesseract OCR.",
+        "explanation": "Text recognized using Tesseract OCR engine.",
         "data": {}
     }
